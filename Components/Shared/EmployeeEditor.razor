@@ -1,0 +1,163 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+
+<EditForm EditContext="editContext" OnSubmit="@OnSubmit">
+    <div class="modal-header">
+        <h5 class="modal-title">Hire Someone</h5>
+    </div>
+    <div class="modal-body">
+
+        <fieldset class="form-group">
+            <legend>Employee Info</legend>
+            <div class="row py-2">
+                <label class="col-sm-3 col-form-label">Name</label>
+                <div class="col-sm-9">
+                    <InputText bind-Value="@Person.Name" Class="form-control" />
+                    <div class="validation-message-inline">
+                        <ValidationMessage For="@(() => Person.Name)" />
+                    </div>
+                </div>
+            </div>
+            <div class="row py-2">
+                <label class="col-sm-3 col-form-label">Salary</label>
+                <div class="col-sm-9">
+                    <InputNumber bind-Value="@Person.Salary" Class="form-control" />
+                    <div class="validation-message-inline">
+                        <ValidationMessage For="@(() => Person.Salary)" />
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        @for (var i = 0; i < Person.Areas.Count; i++)
+        {
+            var area = Person.Areas[i];
+
+            <fieldset class="form-group">
+                <legend>Feature Area</legend>
+                <div class="row py-2">
+                    <label class="col-sm-3 col-form-label">Area</label>
+                    <div class="col-sm-9">
+                        <InputText bind-Value="@area.Name" Class="form-control" />
+                        <div class="validation-message-inline">
+                            <ValidationMessage For="@(() => area.Name)" />
+                        </div>
+                    </div>
+                </div>
+                <div class="row py-2">
+                    <label class="col-sm-3 col-form-label">Focus</label>
+                    <div class="col-sm-9">
+                        <InputNumber bind-Value="@area.Percent" Class="form-control" />
+                        <div class="validation-message-inline">
+                            <ValidationMessage For="@(() => area.Percent)" />
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+        }
+
+        <button class="btn btn-secondary" type="button" onclick="@AddArea" disabled="@(Person.Areas.Count >= 4)">+</button>
+        <button class="btn btn-outline-danger" type="button" onclick="@RemoveArea" disabled="@(Person.Areas.Count <= 1)">-</button>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" type="submit">Hire!</button>
+        <button class="btn btn-secondary btn-sm" type="button" onclick="@OnCancel">Cancel</button>
+    </div>
+</EditForm>
+
+@functions {
+    EditContext editContext;
+    Dictionary<FeatureArea, ValidationMessageStore> stores;
+
+    [Parameter] Person Person { get; set; }
+    [Parameter] Action OnCancel { get; set; }
+    [Parameter] Action OnConfirm { get; set; }
+
+    protected override void OnInit()
+    {
+        editContext = new EditContext(Person);
+        editContext.AddDataAnnotationsValidation();
+
+        // Validate feature areas too.
+        editContext.OnFieldChanged += (sender, e) => ValidateField(e);
+        editContext.OnValidationRequested += (sender, e) => ValidateModel();
+
+        stores = new Dictionary<FeatureArea, ValidationMessageStore>();
+        for (var i = 0; i < Person.Areas.Count; i++)
+        {
+            stores.Add(Person.Areas[i], new ValidationMessageStore(editContext));
+        }
+    }
+
+    void ValidateField(FieldChangedEventArgs e)
+    {
+        if (e.FieldIdentifier.Model is FeatureArea area && stores.TryGetValue(area, out var store))
+        {
+            var validationResults = new List<ValidationResult>();
+            var validationContext = new ValidationContext(e.FieldIdentifier.Model)
+            {
+                MemberName = e.FieldIdentifier.FieldName, // #YOLO
+            };
+
+            var propertyValue = area.GetType().GetProperty(e.FieldIdentifier.FieldName).GetValue(area);
+            Validator.TryValidateProperty(propertyValue, validationContext, validationResults);
+
+            store.Clear();
+            foreach (var validationResult in validationResults)
+            {
+                foreach (var memberName in validationResult.MemberNames)
+                {
+                    store.Add(new FieldIdentifier(area, memberName), validationResult.ErrorMessage);
+                }
+            }
+
+            editContext.NotifyValidationStateChanged();
+        }
+    }
+
+    void ValidateModel()
+    {
+        foreach (var kvp in stores)
+        {
+            var validationContext = new ValidationContext(kvp.Key);
+            var validationResults = new List<ValidationResult>();
+            Validator.TryValidateObject(kvp.Key, validationContext, validationResults, true);
+
+            kvp.Value.Clear();
+            foreach (var validationResult in validationResults)
+            {
+                foreach (var memberName in validationResult.MemberNames)
+                {
+                    kvp.Value.Add(new FieldIdentifier(kvp.Key, memberName), validationResult.ErrorMessage);
+                }
+            }
+        }
+
+        editContext.NotifyValidationStateChanged();
+    }
+
+    void AddArea()
+    {
+        var area = new FeatureArea();
+        Person.Areas.Add(area);
+        stores.Add(area, new ValidationMessageStore(editContext));
+    }
+
+    void RemoveArea()
+    {
+        var area = Person.Areas[Person.Areas.Count - 1];
+        Person.Areas.RemoveAt(Person.Areas.Count - 1);
+        editContext.NotifyValidationStateChanged();
+        stores.Remove(area);
+    }
+
+    Task OnSubmit()
+    {
+        if (editContext.Validate())
+        {
+            OnConfirm();
+        }
+
+        return Task.CompletedTask;
+    }
+}
