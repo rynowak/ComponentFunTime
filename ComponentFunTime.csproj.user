@@ -6,5 +6,6 @@
   <PropertyGroup>
     <ActiveDebugProfile>ComponentFunTime</ActiveDebugProfile>
     <ShowAllFiles>true</ShowAllFiles>
+    <NameOfLastUsedPublishProfile>ComponentFunTime20190224062730 - Web Deploy</NameOfLastUsedPublishProfile>
   </PropertyGroup>
 </Project>
