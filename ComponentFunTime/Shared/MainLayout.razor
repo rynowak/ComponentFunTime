@@ -1,0 +1,48 @@
+﻿@inherits LayoutComponentBase
+
+
+<div class="sidebar">
+    <NavMenu />
+
+    @if (_sections.TryGetSection("menu", out var menu))
+    {
+        @menu
+    }
+</div>
+
+<div class="main">
+    <div class="top-row px-4">
+        @if (_sections.TryGetSection("toprow", out var toprow))
+        {
+            @toprow
+        }
+        else
+        {
+            @:Copyright 2019.
+        }
+    </div>
+
+    <div class="content px-4">
+        <SectionHost Value="_sections" IsFixed="true">
+            @Body
+        </SectionHost>
+    </div>
+</div>
+
+@functions {
+    SectionData _sections = new SectionData();
+
+    protected override void OnInit()
+    {
+        base.OnInit();
+
+        _sections.Changed += (sender, e) => StateHasChanged();
+    }
+
+    protected override void OnAfterRender()
+    {
+        base.OnAfterRender();
+
+        _sections.Clear();
+    }
+}
